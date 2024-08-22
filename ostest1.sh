@@ -6,7 +6,7 @@ PASSWORD="MegaAstra@8431#"
 WALLPAPER_URL="https://raw.githubusercontent.com/rahul-masal/images/main/mgct.png"
 BOOT_LOGO_URL="https://raw.githubusercontent.com/rahul-masal/images/main/bootlogo.png"
 PROFILE_PIC_URL="https://raw.githubusercontent.com/rahul-masal/images/main/image.png"
-IMAGE_DIR="/mnt/data"
+IMAGE_DIR="/mnt/"
 USER_HOME="/home/$USER"
 DESKTOP_DIR="$USER_HOME/Desktop"
 AUTOSTART_DIR="$USER_HOME/.config/autostart"
@@ -27,12 +27,17 @@ error_exit() {
 # Update and install packages
 echo "Updating package lists and installing required packages..."
 sudo apt-get update || error_exit "Failed to update package lists"
-sudo apt-get install -y openssh-server xrdp gnome-tweaks || error_exit "Failed to install required packages"
+sudo apt-get install -y openssh-server xrdp gnome-tweaks wget || error_exit "Failed to install required packages"
 
 # Enable services
 echo "Enabling openssh-server and xrdp services..."
 sudo systemctl enable ssh || error_exit "Failed to enable SSH service"
 sudo systemctl enable xrdp || error_exit "Failed to enable XRDP service"
+
+# Install Google Chrome
+echo "Installing Google Chrome..."
+wget https://dl.google.com/linux/direct/google-chrome-stable_current_amd64.deb -O /tmp/google-chrome.deb || error_exit "Failed to download Google Chrome"
+sudo apt-get install -y /tmp/google-chrome.deb || error_exit "Failed to install Google Chrome"
 
 # Add user with sudo permissions
 echo "Adding user $USER..."
@@ -65,6 +70,10 @@ else
     echo "Boot logo setup is not supported on this system."
 fi
 
+# Set Google Chrome as the default browser
+echo "Setting Google Chrome as the default browser for $USER..."
+sudo -u $USER xdg-settings set default-web-browser google-chrome.desktop || error_exit "Failed to set Google Chrome as the default browser"
+
 # Creating Desktop shortcuts
 echo "Creating website application shortcuts..."
 websites=(
@@ -92,7 +101,7 @@ for site in "${websites[@]}"; do
     cat <<EOF > "$DESKTOP_DIR/$name.desktop"
 [Desktop Entry]
 Name=$name
-Exec=xdg-open $url
+Exec=google-chrome $url
 Type=Application
 Icon=google-chrome
 EOF
