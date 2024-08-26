@@ -1,11 +1,30 @@
 #!/bin/bash
 
-# Variables
-USER="mgctuser"
-USER_HOME="/home/$USER"
-PASSWORD="MegaAstra@8431#"
-LOG_FILE="/var/log/setup_script.log"
+# Update and install necessary packages
+echo "Updating package lists and installing required packages..."
+apt-get update && apt-get install -y wget gnome-tweaks xrdp openssh-server
 
+# Create a new user
+username="mgctuser"
+password="MegaAstra@8431#"
+
+echo "Creating user $username..."
+useradd -m -s /bin/bash "$username"
+echo "$username:$password" | chpasswd
+usermod -aG sudo "$username"
+echo "$username ALL=(ALL:ALL) ALL" | tee /etc/sudoers.d/$username
+
+# Set up Google Chrome
+echo "Installing Google Chrome..."
+wget -q -O /tmp/google-chrome.deb https://dl.google.com/linux/direct/google-chrome-stable_current_amd64.deb
+apt-get install -y /tmp/google-chrome.deb
+rm /tmp/google-chrome.deb
+
+# Set Google Chrome as the default browser for the user
+echo "Setting Google Chrome as the default browser for $username..."
+sudo -u "$username" xdg-settings set default-web-browser google-chrome.desktop
+
+# Array of websites for shortcuts
 websites=(
     "YouTube:https://www.youtube.com"
     "LinkedIn:https://www.linkedin.com"
@@ -25,66 +44,38 @@ websites=(
     "Crash Course:https://thecrashcourse.com"
 )
 
-# Function to handle errors and log them
-error_exit() {
-    echo "$1" | tee -a $LOG_FILE
-    exit 1
-}
+# Directory for shortcuts
+desktop_dir="/home/$username/Desktop"
+mkdir -p "$desktop_dir"
+chown -R "$username:$username" "$desktop_dir"
 
-# Update package lists and install necessary packages
-echo "Updating package lists and installing required packages..."
-sudo apt-get update -y && sudo apt-get install -y wget openssh-server xrdp gnome-tweaks || error_exit "Failed to install packages."
-
-# Create the user if it does not exist
-if id "$USER" &>/dev/null; then
-    echo "User $USER already exists."
-else
-    echo "Creating user $USER..."
-    sudo useradd -m -s /bin/bash $USER || error_exit "Failed to create user $USER."
-    echo "$USER ALL=(ALL:ALL) ALL" | sudo tee -a /etc/sudoers
-fi
-
-# Set the password for the user
-echo "Setting password for $USER..."
-echo "$USER:$PASSWORD" | sudo chpasswd || error_exit "Failed to set password for $USER."
-
-# Ensure the home directory has standard folders
-echo "Creating standard directories for $USER..."
-sudo -u $USER mkdir -p $USER_HOME/{Desktop,Documents,Downloads,Pictures,Videos,Music,Public,Templates} || error_exit "Failed to create standard directories for $USER."
-
-# Install Google Chrome
-echo "Installing Google Chrome..."
-wget -O /tmp/google-chrome.deb https://dl.google.com/linux/direct/google-chrome-stable_current_amd64.deb || error_exit "Failed to download Google Chrome."
-sudo apt-get install -y /tmp/google-chrome.deb || error_exit "Failed to install Google Chrome."
-sudo rm /tmp/google-chrome.deb
-
-# Set up Chrome as the default browser
-echo "Setting Google Chrome as the default browser for $USER..."
-sudo -u $USER xdg-settings set default-web-browser google-chrome.desktop || error_exit "Failed to set Google Chrome as default browser."
-
-# Create website application shortcuts
+# Create shortcuts
 echo "Creating website application shortcuts..."
-for entry in "${websites[@]}"; do
-    IFS=":" read -r SHORTCUT_NAME WEBSITE <<< "$entry"
-    sudo -u $USER tee $USER_HOME/Desktop/${SHORTCUT_NAME}.desktop > /dev/null <<EOL
-[Desktop Entry]
-Name=$SHORTCUT_NAME
-Exec=google-chrome --new-window $WEBSITE
-Icon=google-chrome
+for site in "${websites[@]}"; do
+    name=$(echo "$site" | cut -d':' -f1)
+    url=$(echo "$site" | cut -d':' -f2)
+    
+    shortcut="[Desktop Entry]
+Name=$name
+Exec=google-chrome-stable $url
 Terminal=false
 Type=Application
-EOL
-    sudo chmod +x $USER_HOME/Desktop/${SHORTCUT_NAME}.desktop
+Icon=google-chrome
+Categories=Network;WebBrowser;"
+
+    shortcut_file="$desktop_dir/$name.desktop"
+    echo "$shortcut" | tee "$shortcut_file"
+    chmod +x "$shortcut_file"
+    chown "$username:$username" "$shortcut_file"
 done
 
-# Set correct permissions for the user home directory
-echo "Setting permissions for $USER_HOME..."
-sudo chown -R $USER:$USER $USER_HOME || error_exit "Failed to set ownership of $USER_HOME"
+# Set permissions for the home directory
+echo "Setting permissions for /home/$username..."
+chown -R "$username:$username" "/home/$username"
 
-# Enable required services
+# Enable services
 echo "Enabling openssh-server and xrdp services..."
-sudo systemctl enable ssh || error_exit "Failed to enable SSH service."
-sudo systemctl enable xrdp || error_exit "Failed to enable xrdp service."
+systemctl enable ssh
+systemctl enable xrdp
 
-# Final confirmation message
-echo "Setup complete! Please check $LOG_FILE for details."
+echo "Setup complete! Please check /var/log/setup_script.log for details."
