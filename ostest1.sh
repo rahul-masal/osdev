@@ -3,6 +3,7 @@
 # Variables
 USER="mgctuser"
 USER_HOME="/home/$USER"
+PASSWORD="MegaAstra@8431#"
 LOG_FILE="/var/log/setup_script.log"
 
 websites=(
@@ -42,6 +43,10 @@ else
     sudo useradd -m -s /bin/bash $USER || error_exit "Failed to create user $USER."
     echo "$USER ALL=(ALL:ALL) ALL" | sudo tee -a /etc/sudoers
 fi
+
+# Set the password for the user
+echo "Setting password for $USER..."
+echo "$USER:$PASSWORD" | sudo chpasswd || error_exit "Failed to set password for $USER."
 
 # Ensure the home directory has standard folders
 echo "Creating standard directories for $USER..."
